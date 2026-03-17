@@ -3,6 +3,9 @@ import type { CollectionConfig } from 'payload'
 export const MediaFiles: CollectionConfig = {
   slug: 'media-files',
   dbName: 'media_files',
+  access: {
+    read: () => true,
+  },
   admin: {
     useAsTitle: 'name',
   },

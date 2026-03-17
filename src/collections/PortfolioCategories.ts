@@ -4,6 +4,9 @@ export const PortfolioCategories: CollectionConfig = {
   slug: 'portfolio-categories',
   dbName: 'portfolio_categories',
   timestamps: false,
+  access: {
+    read: () => true,
+  },
   admin: {
     useAsTitle: 'name',
   },

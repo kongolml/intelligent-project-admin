@@ -3,6 +3,9 @@ import type { CollectionConfig } from 'payload'
 export const PortfolioItems: CollectionConfig = {
   slug: 'portfolio-items',
   dbName: 'portfolio_items',
+  access: {
+    read: () => true,
+  },
   admin: {
     useAsTitle: 'name',
   },
