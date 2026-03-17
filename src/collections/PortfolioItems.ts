@@ -41,6 +41,11 @@ export const PortfolioItems: CollectionConfig = {
       name: 'thumbnail',
       type: 'relationship',
       relationTo: 'media-files',
+      admin: {
+        components: {
+          Field: '@/components/ThumbnailField#ThumbnailField',
+        },
+      },
     },
     {
       name: 'mediaFiles',
