@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { lexicalHTMLField } from '@payloadcms/richtext-lexical'
 
 export const PortfolioItems: CollectionConfig = {
   slug: 'portfolio-items',
@@ -32,8 +33,9 @@ export const PortfolioItems: CollectionConfig = {
     },
     {
       name: 'description',
-      type: 'json',
+      type: 'richText'
     },
+    lexicalHTMLField({ lexicalFieldName: 'description', htmlFieldName: 'descriptionHTML' }),
     {
       name: 'categories',
       type: 'relationship',
@@ -61,6 +63,15 @@ export const PortfolioItems: CollectionConfig = {
       type: 'text',
       required: true,
       unique: true,
+      validate: (value: string | null | undefined) => {
+        if (!value) return true
+        return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
+          ? true
+          : 'Slug must contain only lowercase letters, numbers, and hyphens (e.g. my-project-2024)'
+      },
+      admin: {
+        description: 'URL-safe identifier: lowercase letters, numbers, and hyphens only',
+      },
     },
     {
       name: 'isShowcase',
