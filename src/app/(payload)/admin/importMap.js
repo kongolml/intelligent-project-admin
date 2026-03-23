@@ -22,6 +22,7 @@ import { UnderlineFeatureClient as UnderlineFeatureClient_e70f5e05f09f93e00b997e
 import { BoldFeatureClient as BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { ThumbnailField as ThumbnailField_726fee581527d3b44f4df12520fe546b } from '@/components/ThumbnailField'
+import { ImageGalleryField as ImageGalleryField_bc9c539e48545061156d32f5011f5542 } from '@/components/ImageGalleryField'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 export const importMap = {
@@ -49,5 +50,6 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#BoldFeatureClient": BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#ItalicFeatureClient": ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@/components/ThumbnailField#ThumbnailField": ThumbnailField_726fee581527d3b44f4df12520fe546b,
+  "@/components/ImageGalleryField#ImageGalleryField": ImageGalleryField_bc9c539e48545061156d32f5011f5542,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

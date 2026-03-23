@@ -33,9 +33,30 @@ export const PortfolioItems: CollectionConfig = {
     },
     {
       name: 'description',
-      type: 'richText'
+      type: 'richText',
     },
     lexicalHTMLField({ lexicalFieldName: 'description', htmlFieldName: 'descriptionHTML' }),
+    {
+      name: 'client_goal',
+      label: 'Client Goal',
+      type: 'richText',
+      localized: true,
+    },
+    lexicalHTMLField({ lexicalFieldName: 'client_goal', htmlFieldName: 'client_goalHTML' }),
+    {
+      name: 'our_task',
+      type: 'richText',
+      label: 'Our Task',
+      localized: true,
+    },
+    lexicalHTMLField({ lexicalFieldName: 'our_task', htmlFieldName: 'our_taskHTML' }),
+    {
+      name: 'concept',
+      type: 'richText',
+      label: 'Concept',
+      localized: true,
+    },
+    lexicalHTMLField({ lexicalFieldName: 'concept', htmlFieldName: 'conceptHTML' }),
     {
       name: 'categories',
       type: 'relationship',
@@ -43,7 +64,7 @@ export const PortfolioItems: CollectionConfig = {
       hasMany: true,
     },
     {
-      name: 'thumbnail',
+      name: 'main_image',
       type: 'relationship',
       relationTo: 'media-files',
       admin: {
@@ -57,6 +78,42 @@ export const PortfolioItems: CollectionConfig = {
       type: 'relationship',
       relationTo: 'media-files',
       hasMany: true,
+    },
+    {
+      name: 'visual_inspiration',
+      type: 'relationship',
+      relationTo: 'media-files',
+      label: 'Visual Inspiration',
+      hasMany: true,
+      admin: {
+        components: {
+          Field: '@/components/ImageGalleryField#ImageGalleryField',
+        },
+      },
+    },
+    {
+      name: 'visual_exploration',
+      type: 'relationship',
+      relationTo: 'media-files',
+      label: 'Visual Exploration',
+      hasMany: true,
+      admin: {
+        components: {
+          Field: '@/components/ImageGalleryField#ImageGalleryField',
+        },
+      },
+    },
+    {
+      name: 'final_result_gallery',
+      type: 'relationship',
+      relationTo: 'media-files',
+      label: 'Final Result Gallery',
+      hasMany: true,
+      admin: {
+        components: {
+          Field: '@/components/ImageGalleryField#ImageGalleryField',
+        },
+      },
     },
     {
       name: 'slug',
