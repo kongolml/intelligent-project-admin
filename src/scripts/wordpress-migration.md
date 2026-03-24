@@ -89,7 +89,8 @@ WordPress stores files as `post_type='attachment'` entries. Each has:
 2. Download original file from WP media library (or copy from backup)
 3. Upload to DigitalOcean Spaces via `POST /api/upload`
 4. Map old attachment ID → new `MediaFiles` document ID
-5. Use the ID map to set `thumbnail` and `final_result_gallery` on each portfolio item
+5. Use the ID map to set `main_image` and `final_result_gallery` on each portfolio item
+6. After creating/updating each portfolio item, update all associated `MediaFiles` documents (`main_image` + `final_result_gallery` images) to set their `portfolioItems` reverse relationship back to the portfolio item ID
 
 ---
 

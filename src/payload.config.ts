@@ -34,6 +34,7 @@ export default buildConfig({
     locales: [
       { label: 'English', code: 'en' },
       { label: 'Ukrainian', code: 'uk' },
+      { label: 'Russian', code: 'ru' },
     ],
     defaultLocale: 'en',
     fallback: true,

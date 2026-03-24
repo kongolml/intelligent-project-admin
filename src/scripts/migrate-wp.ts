@@ -17,6 +17,10 @@ for (const line of envFile.split('\n')) {
   let val = trimmed.slice(eqIdx + 1).trim()
   if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
     val = val.slice(1, -1)
+  } else {
+    // Strip inline comments (unquoted values only)
+    const commentIdx = val.indexOf(' #')
+    if (commentIdx >= 0) val = val.slice(0, commentIdx).trim()
   }
   process.env[key] = val
 }
@@ -211,6 +215,15 @@ async function downloadImage(url: string): Promise<{ buffer: Buffer; contentType
   }
 }
 
+function parsePhpSerializedIntArray(val: string): string[] {
+  // PHP serialized format: a:2:{i:0;i:680;i:1;i:681;}
+  if (val.startsWith('a:')) {
+    return [...val.matchAll(/i:\d+;i:(\d+);/g)].map(m => m[1])
+  }
+  // Plain comma-separated IDs: "680,681"
+  return val.split(',').map(s => s.trim()).filter(s => /^\d+$/.test(s))
+}
+
 async function migrate() {
   console.log('Reading SQL dump...')
   const sql = fs.readFileSync(SQL_PATH, 'utf-8')
@@ -268,9 +281,13 @@ async function migrate() {
     tridGroups.get(t.trid)![t.language_code] = t.element_id
   }
 
-  // Keep groups that have a Ukrainian translation (uk is the primary language)
-  const ukGroups = [...tridGroups.entries()].filter(([, langs]) => langs.uk)
-  console.log(`  Found ${ukGroups.length} items with Ukrainian translations`)
+  // Keep groups where the ru post exists AND is published
+  const ruGroups = [...tridGroups.entries()].filter(([, langs]) => {
+    if (!langs.ru) return false
+    const ruPost = allPostsById.get(langs.ru)
+    return ruPost?.post_status === 'publish'
+  })
+  console.log(`  Found ${ruGroups.length} items with published Russian translations`)
 
   console.log('Parsing wp_term_relationships...')
   const wpTermRels = extractTable(sql, 'wp_term_relationships', [
@@ -324,30 +341,30 @@ async function migrate() {
   let errors = 0
   let imagesUploaded = 0
 
-  for (const [trid, langs] of ukGroups) {
+  for (const [trid, langs] of ruGroups) {
+    const ruPostId = langs.ru!
     const ukPostId = langs.uk
     const enPostId = langs.en
-    const ruPostId = langs.ru
 
-    const ukPost = allPostsById.get(ukPostId)
-    if (!ukPost) {
-      console.log(`  [SKIP] trid=${trid}: Ukrainian post ID ${ukPostId} not found in wp_posts`)
+    const ruPost = allPostsById.get(ruPostId)
+    if (!ruPost) {
+      console.log(`  [SKIP] trid=${trid}: Russian post ID ${ruPostId} not found in wp_posts`)
       skipped++
       continue
     }
 
-    // Slug: prefer English post_name, fall back to Ukrainian, then Russian
+    // Slug: prefer English post_name, fall back to Russian, then Ukrainian
     let slug = ''
     if (enPostId) {
       const enPost = allPostsById.get(enPostId)
       if (enPost?.post_name) slug = enPost.post_name
     }
-    if (!slug && ukPost.post_name) {
-      slug = ukPost.post_name
+    if (!slug && ruPost.post_name) {
+      slug = ruPost.post_name
     }
-    if (!slug && ruPostId) {
-      const ruPost = allPostsById.get(ruPostId)
-      if (ruPost?.post_name) slug = ruPost.post_name
+    if (!slug && ukPostId) {
+      const ukPost = allPostsById.get(ukPostId)
+      if (ukPost?.post_name) slug = ukPost.post_name
     }
 
     // Sanitize slug to match validation: /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -370,9 +387,9 @@ async function migrate() {
       limit: 1,
     })
 
-    // Description: try uk post_content first, then en, then ru
+    // Description: try ru post_content first, then en, then uk
     let descriptionText = ''
-    for (const postId of [ukPostId, enPostId, ruPostId]) {
+    for (const postId of [ruPostId, enPostId, ukPostId]) {
       if (!postId) continue
       const post = allPostsById.get(postId)
       if (post?.post_content && post.post_content !== 'NULL') {
@@ -385,8 +402,8 @@ async function migrate() {
     }
     const description = textToLexical(descriptionText)
 
-    // Categories - use the source (ru) post's term relationships, then uk, then en
-    const sourcePostId = ruPostId || ukPostId
+    // Categories - use the ru post's term relationships
+    const sourcePostId = ruPostId
     const termIds = termsByPost.get(sourcePostId) || []
     const categoryIds = termIds
       .map(tid => wpTermToPayloadId.get(tid))
@@ -395,6 +412,10 @@ async function migrate() {
     // isShowcase from source post's meta
     const sourceMeta = metaByPost.get(sourcePostId)
     const isShowcase = sourceMeta?.get('is_featured') === '1'
+
+    // Subtitle from short_description postmeta
+    const shortDesc = sourceMeta?.get('short_description')
+    const subtitle = shortDesc && shortDesc !== 'NULL' ? shortDesc.trim() : undefined
 
     // Thumbnail image: get _thumbnail_id from the source post's meta
     let mainImageId: string | undefined
@@ -436,6 +457,47 @@ async function migrate() {
       }
     }
 
+    // Gallery images from images_gallery postmeta (PHP serialized array of attachment IDs)
+    const galleryIds: string[] = []
+    const imagesGalleryRaw = sourceMeta?.get('images_gallery')
+    if (imagesGalleryRaw && imagesGalleryRaw !== 'NULL') {
+      const attachmentIds = parsePhpSerializedIntArray(imagesGalleryRaw)
+      for (const attId of attachmentIds) {
+        const attachmentPost = allPostsById.get(attId)
+        if (!attachmentPost?.guid) continue
+
+        let imageUrl = attachmentPost.guid
+        imageUrl = imageUrl.replace('http://localhost:8888/intproj', 'http://intelligent-project.com')
+
+        try {
+          const imageData = await downloadImage(imageUrl)
+          if (imageData) {
+            const filename = path.basename(new URL(imageUrl).pathname)
+            const s3Key = generateDateBasedPath(filename, 'gallery')
+            const { s3Key: uploadedKey, bucket } = await uploadToS3(imageData.buffer, s3Key, imageData.contentType)
+
+            const mediaDoc = await payload.create({
+              collection: 'media-files',
+              data: {
+                s3Key: uploadedKey,
+                bucket,
+                mime: imageData.contentType,
+                name: attachmentPost.post_title || filename,
+                originalName: filename,
+                size: imageData.buffer.length,
+              },
+            })
+            galleryIds.push(String(mediaDoc.id))
+            imagesUploaded++
+          } else {
+            console.log(`    [WARN] Could not download gallery image: ${imageUrl}`)
+          }
+        } catch (imgErr) {
+          console.log(`    [WARN] Gallery image upload failed: ${imgErr instanceof Error ? imgErr.message : imgErr}`)
+        }
+      }
+    }
+
     try {
       if (existing.docs.length > 0) {
         // Update existing item with missing data
@@ -448,36 +510,89 @@ async function migrate() {
         if (mainImageId && !existingDoc.main_image) {
           updateData.main_image = mainImageId
         }
+        if (galleryIds.length > 0 && (!existingDoc.final_result_gallery || (existingDoc.final_result_gallery as any[]).length === 0)) {
+          updateData.final_result_gallery = galleryIds
+        }
 
-        // Update Ukrainian name
+        // Update Russian name (primary)
         await payload.update({
           collection: 'portfolio-items',
           id: existingDoc.id,
-          locale: 'uk',
+          locale: 'ru',
           data: {
-            name: ukPost.post_title,
+            name: ruPost.post_title,
+            ...(subtitle ? { subtitle } : {}),
             ...updateData,
           },
         })
 
+        // Bind all associated media files back to this portfolio item
+        const allMediaIds = [
+          ...(mainImageId ? [mainImageId] : []),
+          ...galleryIds,
+        ]
+        for (const mediaId of allMediaIds) {
+          const mediaDoc = await payload.findByID({ collection: 'media-files', id: mediaId })
+          const existingRels = Array.isArray(mediaDoc.portfolioItems)
+            ? (mediaDoc.portfolioItems as any[]).map((r: any) => typeof r === 'string' ? r : r.id)
+            : []
+          if (!existingRels.includes(String(existingDoc.id))) {
+            await payload.update({
+              collection: 'media-files',
+              id: mediaId,
+              data: { portfolioItems: [...existingRels, String(existingDoc.id)] },
+            })
+          }
+        }
+
         updated++
-        console.log(`  [UPD] "${ukPost.post_title}" (slug: ${slug})`)
+        console.log(`  [UPD] "${ruPost.post_title}" (slug: ${slug})`)
         continue
       }
 
-      // Create with Ukrainian locale (primary)
+      // Create with Russian locale (primary)
       const doc = await payload.create({
         collection: 'portfolio-items',
-        locale: 'uk',
+        locale: 'ru',
         data: {
-          name: ukPost.post_title,
+          name: ruPost.post_title,
           slug,
           description: description as any,
           categories: categoryIds,
           isShowcase,
+          ...(subtitle ? { subtitle } : {}),
           ...(mainImageId ? { main_image: mainImageId } : {}),
+          ...(galleryIds.length > 0 ? { final_result_gallery: galleryIds } : {}),
         },
       })
+
+      // Bind all associated media files back to this portfolio item
+      const allMediaIds = [
+        ...(mainImageId ? [mainImageId] : []),
+        ...galleryIds,
+      ]
+      for (const mediaId of allMediaIds) {
+        await payload.update({
+          collection: 'media-files',
+          id: mediaId,
+          data: { portfolioItems: [String(doc.id)] },
+        })
+      }
+
+      // Update with Ukrainian locale if available
+      if (ukPostId) {
+        const ukPost = allPostsById.get(ukPostId)
+        if (ukPost) {
+          await payload.update({
+            collection: 'portfolio-items',
+            id: doc.id,
+            locale: 'uk',
+            data: {
+              name: ukPost.post_title,
+            },
+          })
+        }
+      }
 
       // Update with English locale if available
       if (enPostId) {
@@ -495,10 +610,10 @@ async function migrate() {
       }
 
       created++
-      console.log(`  [OK] "${ukPost.post_title}" (slug: ${slug})`)
+      console.log(`  [OK] "${ruPost.post_title}" (slug: ${slug})`)
     } catch (err) {
       errors++
-      console.error(`  [ERR] "${ukPost.post_title}": ${err instanceof Error ? err.message : err}`)
+      console.error(`  [ERR] "${ruPost.post_title}": ${err instanceof Error ? err.message : err}`)
     }
   }
 
