@@ -1,0 +1,49 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SERVER_URL: ${{ secrets.NEXT_PUBLIC_SERVER_URL }}
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.DROPLET_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync build to Droplet
+        run: |
+          rsync -az --delete \
+            .next/standalone/ \
+            ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/
+          rsync -az --delete \
+            .next/static/ \
+            ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/.next/static/
+          rsync -az --delete \
+            public/ \
+            ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/public/
+
+      - name: Restart PM2
+        run: |
+          ssh ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
+            "pm2 restart intelligent-project-adm || pm2 start /var/www/intelligent-project-adm/server.js --name intelligent-project-adm"
