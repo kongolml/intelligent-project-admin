@@ -45,9 +45,11 @@ jobs:
           rsync -az --delete \
             .next/static/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/.next/static/
-          rsync -az --delete \
-            public/ \
-            ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/public/
+          if [ -d public ]; then
+            rsync -az --delete \
+              public/ \
+              ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/public/
+          fi
 
       - name: Restart PM2
         run: |
