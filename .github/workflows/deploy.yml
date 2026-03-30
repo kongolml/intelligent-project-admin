@@ -47,7 +47,7 @@ jobs:
 
       - name: Sync build to Droplet
         run: |
-          rsync -az --delete -e "ssh -p 2269" \
+          rsync -az --delete --exclude='.env' -e "ssh -p 2269" \
             .next/standalone/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/
           rsync -az --delete -e "ssh -p 2269" \
@@ -62,4 +62,4 @@ jobs:
       - name: Restart PM2
         run: |
           ssh -p 2269 ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
-            "pm2 restart intelligent-project-adm || pm2 start /var/www/intelligent-project-adm/server.js --name intelligent-project-adm"
+            "bash -lc 'pm2 restart intelligent-project-adm || pm2 start /var/www/intelligent-project-adm/server.js --name intelligent-project-adm'"
