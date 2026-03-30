@@ -39,19 +39,19 @@ jobs:
 
       - name: Sync build to Droplet
         run: |
-          rsync -az --delete \
+          rsync -az --delete -e "ssh -p 2269" \
             .next/standalone/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/
-          rsync -az --delete \
+          rsync -az --delete -e "ssh -p 2269" \
             .next/static/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/.next/static/
           if [ -d public ]; then
-            rsync -az --delete \
+            rsync -az --delete -e "ssh -p 2269" \
               public/ \
               ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/public/
           fi
 
       - name: Restart PM2
         run: |
-          ssh ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
+          ssh -p 2269 ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
             "pm2 restart intelligent-project-adm || pm2 start /var/www/intelligent-project-adm/server.js --name intelligent-project-adm"
