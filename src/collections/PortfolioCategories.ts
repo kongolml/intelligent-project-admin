@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { notifyFrontend } from '../lib/notifyFrontend'
 
 export const PortfolioCategories: CollectionConfig = {
   slug: 'portfolio-categories',
@@ -9,6 +10,18 @@ export const PortfolioCategories: CollectionConfig = {
   },
   admin: {
     useAsTitle: 'name',
+  },
+  hooks: {
+    afterChange: [
+      ({ doc, collection, operation }) => {
+        void notifyFrontend(collection.slug, operation, doc as Record<string, unknown>)
+      },
+    ],
+    afterDelete: [
+      ({ doc, collection }) => {
+        void notifyFrontend(collection.slug, 'delete', doc as Record<string, unknown>)
+      },
+    ],
   },
   fields: [
     {

@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { lexicalHTMLField } from '@payloadcms/richtext-lexical'
+import { notifyFrontend } from '../lib/notifyFrontend'
 
 export const PortfolioItems: CollectionConfig = {
   slug: 'portfolio-items',
@@ -9,6 +10,18 @@ export const PortfolioItems: CollectionConfig = {
   },
   admin: {
     useAsTitle: 'name',
+  },
+  hooks: {
+    afterChange: [
+      ({ doc, collection, operation }) => {
+        void notifyFrontend(collection.slug, operation, doc as Record<string, unknown>)
+      },
+    ],
+    afterDelete: [
+      ({ doc, collection }) => {
+        void notifyFrontend(collection.slug, 'delete', doc as Record<string, unknown>)
+      },
+    ],
   },
   fields: [
     {
