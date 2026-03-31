@@ -31,12 +31,14 @@ jobs:
           NEXT_PUBLIC_SERVER_URL: ${{ secrets.NEXT_PUBLIC_SERVER_URL }}
           PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+          PAYLOAD_WEBHOOK_SECRET: ${{ secrets.PAYLOAD_WEBHOOK_SECRET }}
+          FRONTEND_URL: http://localhost:3001
           DIGITALOCEAN_SPACE_REGION: fra1
           DIGITALOCEAN_SPACE_ENDPOINT: https://fra1.digitaloceanspaces.com
           DIGITALOCEAN_SPACE_BUCKET: intelligent-project
           DIGITALOCEAN_SPACE_HOST: fra1.digitaloceanspaces.com
-          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
 
       - name: Setup SSH
         run: |
@@ -47,19 +49,52 @@ jobs:
 
       - name: Sync build to Droplet
         run: |
-          rsync -az --delete --exclude='.env' -e "ssh -p 2269" \
+          rsync -az --delete --exclude='.env' -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }}" \
             .next/standalone/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/
-          rsync -az --delete -e "ssh -p 2269" \
+          rsync -az --delete -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }}" \
             .next/static/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/.next/static/
           if [ -d public ]; then
-            rsync -az --delete -e "ssh -p 2269" \
+            rsync -az --delete -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }}" \
               public/ \
               ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/public/
           fi
 
+      - name: Write .env to Droplet
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+          NEXT_PUBLIC_SERVER_URL: ${{ secrets.NEXT_PUBLIC_SERVER_URL }}
+          PAYLOAD_WEBHOOK_SECRET: ${{ secrets.PAYLOAD_WEBHOOK_SECRET }}
+        run: |
+          cat > /tmp/app.env << EOF
+          NODE_ENV=production
+          PORT=3000
+          DATABASE_URL=$DATABASE_URL
+          PAYLOAD_SECRET=$PAYLOAD_SECRET
+          S3_ACCESS_KEY=$S3_ACCESS_KEY
+          S3_SECRET_KEY=$S3_SECRET_KEY
+          NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL
+          PAYLOAD_WEBHOOK_SECRET=$PAYLOAD_WEBHOOK_SECRET
+          FRONTEND_URL=http://localhost:3001
+          DIGITALOCEAN_SPACE_REGION=fra1
+          DIGITALOCEAN_SPACE_ENDPOINT=https://fra1.digitaloceanspaces.com
+          DIGITALOCEAN_SPACE_BUCKET=intelligent-project
+          DIGITALOCEAN_SPACE_HOST=fra1.digitaloceanspaces.com
+          EOF
+          scp -P ${{ secrets.DROPLET_SSH_PORT }} -i ~/.ssh/id_rsa /tmp/app.env \
+            ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/.env
+          ssh -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
+            "chmod 600 /var/www/intelligent-project-adm/.env"
+          rm /tmp/app.env
+
       - name: Restart PM2
         run: |
-          ssh -p 2269 ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
-            "bash -lc 'pm2 restart intelligent-project-adm || pm2 start /var/www/intelligent-project-adm/server.js --name intelligent-project-adm'"
+          ssh -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
+            "bash -lc 'pm2 restart intelligent-project-adm \
+              || pm2 start /var/www/intelligent-project-adm/server.js \
+                   --name intelligent-project-adm \
+                   --cwd /var/www/intelligent-project-adm'"
