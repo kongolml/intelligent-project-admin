@@ -43,20 +43,22 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
           echo "${{ secrets.DROPLET_HOST_KEY }}" >> ~/.ssh/known_hosts
+          eval $(ssh-agent -s)
+          echo "${{ secrets.DROPLET_SSH_KEY }}" | ssh-add -
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> $GITHUB_ENV
 
       - name: Sync build to Droplet
         run: |
-          rsync -az --delete --exclude='.env' -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }} -i ~/.ssh/id_rsa" \
+          rsync -az --delete --exclude='.env' -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }}" \
             .next/standalone/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/
-          rsync -az --delete -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }} -i ~/.ssh/id_rsa" \
+          rsync -az --delete -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }}" \
             .next/static/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/.next/static/
           if [ -d public ]; then
-            rsync -az --delete -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }} -i ~/.ssh/id_rsa" \
+            rsync -az --delete -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }}" \
               public/ \
               ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/public/
           fi
@@ -85,15 +87,15 @@ jobs:
           DIGITALOCEAN_SPACE_BUCKET=intelligent-project
           DIGITALOCEAN_SPACE_HOST=fra1.digitaloceanspaces.com
           EOF
-          scp -P ${{ secrets.DROPLET_SSH_PORT }} -i ~/.ssh/id_rsa /tmp/app.env \
+          scp -P ${{ secrets.DROPLET_SSH_PORT }} /tmp/app.env \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/.env
-          ssh -i ~/.ssh/id_rsa -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
+          ssh -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
             "chmod 600 /var/www/intelligent-project-adm/.env"
           rm /tmp/app.env
 
       - name: Restart PM2
         run: |
-          ssh -i ~/.ssh/id_rsa -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
+          ssh -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
             "bash -lc 'pm2 restart intelligent-project-adm \
               || pm2 start /var/www/intelligent-project-adm/server.js \
                    --name intelligent-project-adm \
