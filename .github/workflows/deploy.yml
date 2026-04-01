@@ -45,7 +45,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+          echo "${{ secrets.DROPLET_HOST_KEY }}" >> ~/.ssh/known_hosts
 
       - name: Sync build to Droplet
         run: |
