@@ -51,6 +51,7 @@ jobs:
 
       - name: Sync build to Droplet
         run: |
+          ssh -v -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} echo "SSH OK" || true
           rsync -az --delete --exclude='.env' -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }}" \
             .next/standalone/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/
