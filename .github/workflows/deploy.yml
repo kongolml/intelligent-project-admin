@@ -7,6 +7,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
     steps:
       - uses: actions/checkout@v4
 
@@ -51,7 +55,6 @@ jobs:
 
       - name: Sync build to Droplet
         run: |
-          ssh -v -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} echo "SSH OK" || true
           rsync -az --delete --exclude='.env' -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }}" \
             .next/standalone/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/
@@ -73,26 +76,22 @@ jobs:
           NEXT_PUBLIC_SERVER_URL: ${{ secrets.NEXT_PUBLIC_SERVER_URL }}
           PAYLOAD_WEBHOOK_SECRET: ${{ secrets.PAYLOAD_WEBHOOK_SECRET }}
         run: |
-          cat > /tmp/app.env << EOF
-          NODE_ENV=production
-          PORT=3000
-          DATABASE_URL=$DATABASE_URL
-          PAYLOAD_SECRET=$PAYLOAD_SECRET
-          S3_ACCESS_KEY=$S3_ACCESS_KEY
-          S3_SECRET_KEY=$S3_SECRET_KEY
-          NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL
-          PAYLOAD_WEBHOOK_SECRET=$PAYLOAD_WEBHOOK_SECRET
-          FRONTEND_URL=http://localhost:3001
-          DIGITALOCEAN_SPACE_REGION=fra1
-          DIGITALOCEAN_SPACE_ENDPOINT=https://fra1.digitaloceanspaces.com
-          DIGITALOCEAN_SPACE_BUCKET=intelligent-project
-          DIGITALOCEAN_SPACE_HOST=fra1.digitaloceanspaces.com
-          EOF
-          scp -P ${{ secrets.DROPLET_SSH_PORT }} /tmp/app.env \
-            ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/.env
-          ssh -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
-            "chmod 600 /var/www/intelligent-project-adm/.env"
-          rm /tmp/app.env
+          printf '%s\n' \
+            "NODE_ENV=production" \
+            "PORT=3000" \
+            "DATABASE_URL=$DATABASE_URL" \
+            "PAYLOAD_SECRET=$PAYLOAD_SECRET" \
+            "S3_ACCESS_KEY=$S3_ACCESS_KEY" \
+            "S3_SECRET_KEY=$S3_SECRET_KEY" \
+            "NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL" \
+            "PAYLOAD_WEBHOOK_SECRET=$PAYLOAD_WEBHOOK_SECRET" \
+            "FRONTEND_URL=http://localhost:3001" \
+            "DIGITALOCEAN_SPACE_REGION=fra1" \
+            "DIGITALOCEAN_SPACE_ENDPOINT=https://fra1.digitaloceanspaces.com" \
+            "DIGITALOCEAN_SPACE_BUCKET=intelligent-project" \
+            "DIGITALOCEAN_SPACE_HOST=fra1.digitaloceanspaces.com" \
+          | ssh -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
+            "cat > /var/www/intelligent-project-adm/.env && chmod 600 /var/www/intelligent-project-adm/.env"
 
       - name: Restart PM2
         run: |
