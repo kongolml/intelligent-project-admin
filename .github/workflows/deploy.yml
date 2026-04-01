@@ -49,14 +49,14 @@ jobs:
 
       - name: Sync build to Droplet
         run: |
-          rsync -az --delete --exclude='.env' -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }}" \
+          rsync -az --delete --exclude='.env' -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }} -i ~/.ssh/id_rsa" \
             .next/standalone/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/
-          rsync -az --delete -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }}" \
+          rsync -az --delete -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }} -i ~/.ssh/id_rsa" \
             .next/static/ \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/.next/static/
           if [ -d public ]; then
-            rsync -az --delete -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }}" \
+            rsync -az --delete -e "ssh -p ${{ secrets.DROPLET_SSH_PORT }} -i ~/.ssh/id_rsa" \
               public/ \
               ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/public/
           fi
@@ -87,13 +87,13 @@ jobs:
           EOF
           scp -P ${{ secrets.DROPLET_SSH_PORT }} -i ~/.ssh/id_rsa /tmp/app.env \
             ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/intelligent-project-adm/.env
-          ssh -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
             "chmod 600 /var/www/intelligent-project-adm/.env"
           rm /tmp/app.env
 
       - name: Restart PM2
         run: |
-          ssh -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.DROPLET_SSH_PORT }} ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} \
             "bash -lc 'pm2 restart intelligent-project-adm \
               || pm2 start /var/www/intelligent-project-adm/server.js \
                    --name intelligent-project-adm \
